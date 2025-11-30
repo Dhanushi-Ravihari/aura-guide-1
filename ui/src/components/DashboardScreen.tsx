@@ -24,6 +24,20 @@ import {
 } from "lucide-react";
 
 export function DashboardScreen({ user, goals, habits, onNavigate }) {
+  const getTimeBasedGreeting = () => {
+    const hour = new Date().getHours();
+    const userName = user?.name || "User";
+    if (hour >= 5 && hour < 12) {
+      return `Good morning, ${userName}! Have a nice day! ✨`;
+    } else if (hour >= 12 && hour < 17) {
+      return `Good afternoon, ${userName}! 🌞`;
+    } else if (hour >= 17 && hour < 21) {
+      return `Good evening, ${userName}! 🌆`;
+    } else {
+      return `Hope you had a great day, ${userName}! 🌙`;
+    }
+  };
+
   const currentGoal = goals[0]; // Assuming first goal is primary
   const todaysTasks = [
     {
@@ -79,7 +93,7 @@ export function DashboardScreen({ user, goals, habits, onNavigate }) {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl text-gradient">
-              Good morning, {user?.name || "User"}! ✨
+              {getTimeBasedGreeting()}
             </h1>
             <p className="text-ash-600">
               {new Date().toLocaleDateString("en-US", {
