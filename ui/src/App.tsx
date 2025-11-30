@@ -13,6 +13,7 @@ import { ProgressScreen } from "./components/ProgressScreen";
 import { SettingsScreen } from "./components/SettingsScreen";
 import { BottomNavigation } from "./components/BottomNavigation";
 import { BackgroundInfoScreen } from "./components/BackgroundInfoScreen";
+import { MotivationalNotification } from "./components/MotivationalNotification";
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState("splash");
@@ -168,24 +169,29 @@ export default function App() {
     }
   };
 
-  return (
-    <div className="min-h-screen">
-      <div className="max-w-md mx-auto glass-card shadow-glow min-h-screen relative">
-        <div
-          className={
-            screensWithBottomNav.includes(currentScreen) ? "pb-20" : ""
-          }
-        >
-          {renderScreen()}
-        </div>
+  const screenName =
+    typeof currentScreen === "string" ? currentScreen : currentScreen.name;
 
-        {screensWithBottomNav.includes(currentScreen) && (
-          <BottomNavigation
-            currentScreen={currentScreen}
-            onNavigate={handleNavigation}
-          />
-        )}
+  return (
+    <>
+      <div className="min-h-screen relative overflow-visible">
+        <div className="max-w-md mx-auto glass-card shadow-glow min-h-screen relative">
+          <div
+            className={
+              screensWithBottomNav.includes(screenName) ? "pb-20" : ""
+            }
+          >
+            {renderScreen()}
+          </div>
+          {screensWithBottomNav.includes(screenName) && (
+            <BottomNavigation
+              currentScreen={screenName}
+              onNavigate={handleNavigation}
+            />
+          )}
+        </div>
       </div>
-    </div>
+      <MotivationalNotification />
+    </>
   );
 }
