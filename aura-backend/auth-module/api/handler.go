@@ -9,18 +9,21 @@ import (
 )
 
 type AuthRequest struct {
-	Email          string `json:"email"`
-	Password       string `json:"password"`
-	FirstName      string `json:"first_name"`
-	LastName       string `json:"last_name"`
-	DegreeProgram  string `json:"degree_program"`
-	University     string `json:"university"`
-	GoalID         int    `json:"goal_id"`
-	StudyYear      int    `json:"study_year"`
+	Email               string `json:"email"`
+	Password            string `json:"password"`
+	FirstName           string `json:"first_name"`
+	LastName            string `json:"last_name"`
+	DegreeProgram       string `json:"degree_program"`
+	University          string `json:"university"`
+	TechnicalSkillLevel string `json:"technical_skill_level"`
+	SoftSkillLevel      string `json:"soft_skill_level"`
+	AvailabilityType    string `json:"availability_type"`
+	AvailabilityHours   int    `json:"availability_hours"`
+	GoalID              int    `json:"goal_id"`
+	StudyYear           int    `json:"study_year"`
 }
 
 func RegisterHandlers(mux http.Handler) {
-	// Handlers are usually registered in main, but we can provide helpers
 }
 
 func SignupHandler(w http.ResponseWriter, r *http.Request) {
@@ -30,16 +33,39 @@ func SignupHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := service.Signup(r.Context(), req.Email, req.Password, req.FirstName, req.LastName, req.DegreeProgram, req.University, req.GoalID, req.StudyYear); err != nil {
+	if err := service.Signup(
+		r.Context(),
+		req.Email,
+		req.Password,
+		req.FirstName,
+		req.LastName,
+		req.DegreeProgram,
+		req.University,
+		req.TechnicalSkillLevel,
+		req.SoftSkillLevel,
+		req.AvailabilityType,
+		req.AvailabilityHours,
+		req.GoalID,
+		req.StudyYear,
+	); err != nil {
 		http.Error(w, "Error creating user: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]string{"message": "User created successfully"})
 }
 
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
+	signin(w, r)
+}
+
+func SigninHandler(w http.ResponseWriter, r *http.Request) {
+	signin(w, r)
+}
+
+func signin(w http.ResponseWriter, r *http.Request) {
 	var req AuthRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request", http.StatusBadRequest)
@@ -57,10 +83,16 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		Value:    token,
 		Expires:  time.Now().Add(24 * time.Hour),
 		HttpOnly: true,
-		Secure:   true, // Should be true in production
+		Secure:   true,
 		Path:     "/",
 	})
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"token": token, "message": "Login successful"})
+}
+
+func SignoutHandler(w http.ResponseWriter, r *http.Request) {
+	service.Signout(w)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"message": "Logout successful"})
 }

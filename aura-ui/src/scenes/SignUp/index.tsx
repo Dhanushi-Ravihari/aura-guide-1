@@ -14,7 +14,7 @@ export function SignUpScreen({
 }: {
   onOpenTerms: () => void;
   onOpenSignIn: () => void;
-  onContinue: (email: string) => void;
+  onContinue: (email: string, password: string) => void;
 }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -40,7 +40,7 @@ export function SignUpScreen({
     }
 
     setError("");
-    onContinue(email);
+    onContinue(email, password);
   };
 
   return (
@@ -90,7 +90,7 @@ export function SignUpScreen({
           <View style={[styles.checkbox, acceptTerms ? styles.checkboxChecked : undefined]}>
             {acceptTerms ? <Ionicons name="checkmark" size={14} color={palette.surface} /> : null}
           </View>
-          <Text style={styles.checkboxText}>I accept the Terms and Conditions</Text>
+          <Text style={styles.checkboxText}>I accept the Terms & Conditions and Privacy Policy</Text>
         </Pressable>
 
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
