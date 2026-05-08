@@ -20,46 +20,73 @@ export function SettingsScreen({
   onSignOut: () => void;
 }) {
   return (
-    <ScrollView contentContainerStyle={styles.screenContent}>
-      <ScreenHeader title="Settings" subtitle="Manage your preferences" onBack={onBack} />
+    <ScrollView contentContainerStyle={[styles.screenContent, { backgroundColor: palette.background }]}>
+      <ScreenHeader title="Settings" subtitle="Preferences & account" onBack={onBack} />
 
-      <AppCard style={commonStyles.stackMd}>
+      <AppCard style={styles.sectionCard}>
         <Text style={styles.sectionTitle}>Account</Text>
-        <View style={commonStyles.stackSm}>
+        <View style={styles.rows}>
           <Pressable onPress={onOpenTerms} style={styles.settingsRow}>
-            <Text style={commonStyles.cardBodyStrong}>Terms & Conditions</Text>
+            <View style={styles.rowLabel}>
+              <View style={[styles.iconCircle, { backgroundColor: palette.chipBlue }]}>
+                <Ionicons name="document-text-outline" size={20} color={palette.primary} />
+              </View>
+              <Text style={styles.rowText}>Terms & Conditions</Text>
+            </View>
             <Ionicons name="chevron-forward" size={18} color={palette.muted} />
           </Pressable>
         </View>
       </AppCard>
 
-      <AppCard style={commonStyles.stackMd}>
+      <AppCard style={styles.sectionCard}>
         <Text style={styles.sectionTitle}>Preferences</Text>
-        <View style={commonStyles.stackSm}>
+        <View style={styles.rows}>
           <View style={styles.settingsRow}>
-            <Text style={commonStyles.cardBodyStrong}>Notifications</Text>
+            <View style={styles.rowLabel}>
+              <View style={[styles.iconCircle, { backgroundColor: palette.chipGreen }]}>
+                <Ionicons name="notifications-outline" size={20} color={palette.success} />
+              </View>
+              <Text style={styles.rowText}>Notifications</Text>
+            </View>
             <Switch
               value={values.notifications}
               onValueChange={(notifications) => onChange({ ...values, notifications })}
-              trackColor={{ false: palette.border, true: "#93C5FD" }}
+              trackColor={{ false: palette.border, true: palette.primaryMuted }}
+              thumbColor={values.notifications ? palette.primary : "#f4f3f4"}
             />
           </View>
+
           <View style={styles.settingsRow}>
-            <Text style={commonStyles.cardBodyStrong}>Dark Mode</Text>
+            <View style={styles.rowLabel}>
+              <View style={[styles.iconCircle, { backgroundColor: palette.chipPurple }]}>
+                <Ionicons name="moon-outline" size={20} color={palette.secondary} />
+              </View>
+              <Text style={styles.rowText}>Dark Mode</Text>
+            </View>
             <Switch
               value={values.darkMode}
               onValueChange={(darkMode) => onChange({ ...values, darkMode })}
-              trackColor={{ false: palette.border, true: "#C4B5FD" }}
+              trackColor={{ false: palette.border, true: palette.primaryMuted }}
+              thumbColor={values.darkMode ? palette.primary : "#f4f3f4"}
             />
           </View>
+
           <View style={styles.settingsRow}>
-            <Text style={commonStyles.cardBodyStrong}>Language</Text>
-            <Text style={commonStyles.helperText}>{values.language}</Text>
+            <View style={styles.rowLabel}>
+              <View style={[styles.iconCircle, { backgroundColor: palette.chipYellow }]}>
+                <Ionicons name="language-outline" size={20} color={palette.warning} />
+              </View>
+              <Text style={styles.rowText}>Language</Text>
+            </View>
+            <Text style={styles.valueText}>{values.language}</Text>
           </View>
         </View>
       </AppCard>
 
-      <PrimaryButton label="Sign Out" onPress={onSignOut} secondary />
+      <View style={styles.footer}>
+        <PrimaryButton label="Sign Out" onPress={onSignOut} variant="danger" />
+        <Text style={styles.versionText}>Version 1.0.0 (AURA)</Text>
+      </View>
     </ScrollView>
   );
 }
@@ -67,19 +94,59 @@ export function SettingsScreen({
 const styles = StyleSheet.create({
   screenContent: {
     paddingHorizontal: 20,
-    paddingTop: 18,
-    paddingBottom: 24,
+    paddingTop: 8,
+    paddingBottom: 40,
+    gap: 20,
+  },
+  sectionCard: {
+    padding: 16,
     gap: 16,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: palette.text,
+    fontSize: 14,
+    fontWeight: "900",
+    color: palette.muted,
+    textTransform: "uppercase",
+    letterSpacing: 1,
+  },
+  rows: {
+    gap: 20,
   },
   settingsRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+  },
+  rowLabel: {
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
+  },
+  iconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  rowText: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: palette.text,
+  },
+  valueText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: palette.muted,
+  },
+  footer: {
+    marginTop: 12,
+    gap: 16,
+  },
+  versionText: {
+    textAlign: "center",
+    fontSize: 12,
+    color: palette.muted,
+    fontWeight: "600",
   },
 });

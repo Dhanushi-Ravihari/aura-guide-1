@@ -12,7 +12,8 @@ export function TextLink({ label, onPress }: { label: string; onPress: () => voi
 
 const styles = StyleSheet.create({
   link: {
-    color: palette.primary,
-    fontWeight: "700",
+    color: palette.primaryMuted,
+    fontWeight: "800",
+    fontSize: 14,
   },
 });

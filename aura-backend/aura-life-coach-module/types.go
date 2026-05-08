@@ -29,3 +29,8 @@ type CVAnalysisResponse struct {
 	Strengths    []string `json:"strengths"`
 	Improvements []string `json:"improvements"`
 }
+
+type CVMeta struct {
+	FileName   string    `json:"file_name"`
+	UploadedAt time.Time `json:"uploaded_at"`
+}

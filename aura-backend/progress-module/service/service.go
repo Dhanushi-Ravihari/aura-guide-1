@@ -18,3 +18,7 @@ func GetCurrentTask(ctx context.Context, email string) (*progress.Task, error) {
 func GetCompletedTasks(ctx context.Context, email string) ([]progress.Task, error) {
 	return dao.GetCompletedTasks(ctx, email)
 }
+
+func GetDashboardSummary(ctx context.Context, email string) (*progress.DashboardSummary, error) {
+	return dao.GetDashboardSummary(ctx, email)
+}

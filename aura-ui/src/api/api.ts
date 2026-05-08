@@ -25,6 +25,15 @@ export const api = {
     if (!response.ok) throw new Error(await response.text());
     return response.json();
   },
+  async validateSignupEmail(email: string) {
+    const response = await fetch(`${API_BASE_URL}/auth/validate-email`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+    if (!response.ok) throw new Error((await response.text()).trim());
+    return response.json();
+  },
 
   /**
    * Authenticate user credentials and preserve the session token.
@@ -91,6 +100,14 @@ export const api = {
     if (!response.ok) throw new Error(await response.text());
     return response.json();
   },
+  async getDashboardSummary() {
+    const response = await fetch(`${API_BASE_URL}/progress/dashboard`, {
+      method: "GET",
+      headers: await authHeaders(false),
+    });
+    if (!response.ok) throw new Error(await response.text());
+    return response.json();
+  },
   async generateTaskPlan() {
     const response = await fetch(`${API_BASE_URL}/task-plan/generatePlan`, {
       method: "GET",
@@ -125,6 +142,14 @@ export const api = {
     if (!response.ok) throw new Error(await response.text());
     return response.json();
   },
+  async deleteTask(taskId: number) {
+    const response = await fetch(`${API_BASE_URL}/task-plan/tasks/${taskId}`, {
+      method: "DELETE",
+      headers: await authHeaders(false),
+    });
+    if (!response.ok) throw new Error(await response.text());
+    return response.json();
+  },
   async uploadCV(fileName: string, content: string) {
     const response = await fetch(`${API_BASE_URL}/aura-life-coach/cv/upload`, {
       method: "POST",
@@ -144,6 +169,49 @@ export const api = {
   },
   async getCVFeedback() {
     const response = await fetch(`${API_BASE_URL}/aura-life-coach/cv/feedback`, {
+      method: "GET",
+      headers: await authHeaders(false),
+    });
+    if (!response.ok) throw new Error(await response.text());
+    return response.json();
+  },
+  async listCVs() {
+    const response = await fetch(`${API_BASE_URL}/aura-life-coach/cv/list`, {
+      method: "GET",
+      headers: await authHeaders(false),
+    });
+    if (!response.ok) throw new Error(await response.text());
+    return response.json();
+  },
+  async getGoalSummary() {
+    const response = await fetch(`${API_BASE_URL}/goals/summary`, {
+      method: "GET",
+      headers: await authHeaders(false),
+    });
+    if (!response.ok) throw new Error(await response.text());
+    return response.json();
+  },
+
+  async getDailyTaskReminder() {
+    const response = await fetch(`${API_BASE_URL}/notification/dailyTaskReminder`, {
+      method: "GET",
+      headers: await authHeaders(false),
+    });
+    if (!response.ok) throw new Error(await response.text());
+    return response.json();
+  },
+
+  async getMotivationalQuote() {
+    const response = await fetch(`${API_BASE_URL}/notification/motivationalQuote`, {
+      method: "GET",
+      headers: await authHeaders(false),
+    });
+    if (!response.ok) throw new Error(await response.text());
+    return response.json();
+  },
+
+  async getBehavioralInterviewFeedback() {
+    const response = await fetch(`${API_BASE_URL}/aura-life-coach/BehavioralInterviewFeedback`, {
       method: "GET",
       headers: await authHeaders(false),
     });

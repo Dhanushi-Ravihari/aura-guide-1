@@ -100,6 +100,17 @@ func GetCVFeedbackHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(feedback)
 }
 
+func ListCVsHandler(w http.ResponseWriter, r *http.Request) {
+	email, ok := r.Context().Value(middleware.UserEmailKey).(string)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	items := service.ListCVs(email)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(items)
+}
+
 func writeQuestions(w http.ResponseWriter, r *http.Request, topic string) {
 	questions := service.GetQuestions(topic)
 	w.Header().Set("Content-Type", "application/json")

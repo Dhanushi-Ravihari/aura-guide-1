@@ -2,10 +2,14 @@ package dao
 
 import (
 	"context"
+	"errors"
 	"strings"
+	"time"
 
+	"aura-backend/common/db"
 	progress "aura-backend/progress-module"
 	taskdao "aura-backend/task-plan-module/dao"
+	"github.com/jackc/pgx/v5"
 )
 
 func GetOverview(ctx context.Context, email string) (*progress.Overview, error) {
@@ -33,7 +37,13 @@ func GetCurrentTask(ctx context.Context, email string) (*progress.Task, error) {
 
 	for _, task := range tasks {
 		if !strings.EqualFold(task.Status, "completed") {
-			return &progress.Task{ID: task.ID, Task: task.Task, Status: task.Status}, nil
+			return &progress.Task{
+				ID:            task.ID,
+				Task:          task.Task,
+				Status:        task.Status,
+				StartDateTime: task.StartDateTime,
+				EndDateTime:   task.EndDateTime,
+			}, nil
 		}
 	}
 	return &progress.Task{}, nil
@@ -48,8 +58,105 @@ func GetCompletedTasks(ctx context.Context, email string) ([]progress.Task, erro
 	result := make([]progress.Task, 0)
 	for _, task := range tasks {
 		if strings.EqualFold(task.Status, "completed") {
-			result = append(result, progress.Task{ID: task.ID, Task: task.Task, Status: task.Status})
+			result = append(result, progress.Task{
+				ID:            task.ID,
+				Task:          task.Task,
+				Status:        task.Status,
+				StartDateTime: task.StartDateTime,
+				EndDateTime:   task.EndDateTime,
+			})
 		}
 	}
 	return result, nil
+}
+
+func GetDashboardSummary(ctx context.Context, email string) (*progress.DashboardSummary, error) {
+	var summary progress.DashboardSummary
+	var userID int
+
+	err := db.Pool.QueryRow(ctx, `SELECT u.id, COALESCE(u.first_name, ''), COALESCE(u.last_name, ''), COALESCE(u.current_score, 0), COALESCE(g.name, '')
+		FROM user_student u
+		LEFT JOIN goals g ON g.id = u.goal_id
+		WHERE u.email = $1`, email).Scan(&userID, &summary.FirstName, &summary.LastName, &summary.CurrentScore, &summary.CareerTitle)
+	if err != nil {
+		return nil, err
+	}
+
+	dayStreak, err := upsertAndGetDayStreak(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	summary.DayStreak = dayStreak
+
+	tasks, err := taskdao.GetTaskPlan(ctx, email)
+	if err != nil {
+		return nil, err
+	}
+
+	now := time.Now()
+	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	todayEnd := todayStart.Add(24 * time.Hour)
+
+	for _, task := range tasks {
+		if strings.EqualFold(task.Status, "completed") {
+			summary.CompletedTasks++
+			continue
+		}
+
+		taskItem := progress.Task{
+			ID:            task.ID,
+			Task:          task.Task,
+			Status:        task.Status,
+			StartDateTime: task.StartDateTime,
+			EndDateTime:   task.EndDateTime,
+		}
+
+		summary.OngoingTasks = append(summary.OngoingTasks, taskItem)
+
+		if task.StartDateTime != nil {
+			taskStart := task.StartDateTime.In(now.Location())
+			if !taskStart.Before(todayStart) && taskStart.Before(todayEnd) {
+				summary.TodaysPlan = append(summary.TodaysPlan, taskItem)
+			}
+		}
+	}
+
+	return &summary, nil
+}
+
+func upsertAndGetDayStreak(ctx context.Context, userID int) (int, error) {
+	now := time.Now()
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	yesterday := today.AddDate(0, 0, -1)
+
+	var streakID int
+	var numberOfDays int
+	var lastUpdated time.Time
+	err := db.Pool.QueryRow(ctx, `SELECT id, number_of_days, last_updated FROM user_streak WHERE user_id = $1`, userID).Scan(&streakID, &numberOfDays, &lastUpdated)
+	if err != nil {
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return 0, err
+		}
+		// no row yet
+		err = db.Pool.QueryRow(ctx, `INSERT INTO user_streak (user_id, number_of_days, last_updated) VALUES ($1, 1, $2) RETURNING number_of_days`, userID, now).Scan(&numberOfDays)
+		if err != nil {
+			return 0, err
+		}
+		return numberOfDays, nil
+	}
+
+	lastDay := time.Date(lastUpdated.Year(), lastUpdated.Month(), lastUpdated.Day(), 0, 0, 0, 0, lastUpdated.Location())
+	switch {
+	case lastDay.Equal(today):
+		return numberOfDays, nil
+	case lastDay.Equal(yesterday):
+		numberOfDays++
+	default:
+		numberOfDays = 1
+	}
+
+	if _, err := db.Pool.Exec(ctx, `UPDATE user_streak SET number_of_days = $1, last_updated = $2 WHERE id = $3`, numberOfDays, now, streakID); err != nil {
+		return 0, err
+	}
+	return numberOfDays, nil
 }

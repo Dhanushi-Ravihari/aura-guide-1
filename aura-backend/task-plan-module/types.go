@@ -16,6 +16,7 @@ type SkillScoreResponse struct {
 type Task struct {
 	ID            int        `json:"id"`
 	SkillID       *int       `json:"skill_id,omitempty"`
+	IsCustom      bool       `json:"is_custom"`
 	Task          string     `json:"task"`
 	Status        string     `json:"status"`
 	StartDateTime *time.Time `json:"start_date_time,omitempty"`
