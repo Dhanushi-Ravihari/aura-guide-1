@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"time"
 
@@ -13,6 +14,8 @@ type AuthRequest struct {
 	Password            string `json:"password"`
 	FirstName           string `json:"first_name"`
 	LastName            string `json:"last_name"`
+	FirstNameCamel      string `json:"firstName"`
+	LastNameCamel       string `json:"lastName"`
 	DegreeProgram       string `json:"degree_program"`
 	University          string `json:"university"`
 	TechnicalSkillLevel string `json:"technical_skill_level"`
@@ -33,6 +36,13 @@ func SignupHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if req.FirstName == "" {
+		req.FirstName = req.FirstNameCamel
+	}
+	if req.LastName == "" {
+		req.LastName = req.LastNameCamel
+	}
+
 	if err := service.Signup(
 		r.Context(),
 		req.Email,
@@ -48,13 +58,43 @@ func SignupHandler(w http.ResponseWriter, r *http.Request) {
 		req.GoalID,
 		req.StudyYear,
 	); err != nil {
-		http.Error(w, "Error creating user: "+err.Error(), http.StatusInternalServerError)
+		switch {
+		case errors.Is(err, service.ErrInvalidEmail):
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		case errors.Is(err, service.ErrEmailExists):
+			http.Error(w, err.Error(), http.StatusConflict)
+		default:
+			http.Error(w, "Error creating user: "+err.Error(), http.StatusInternalServerError)
+		}
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]string{"message": "User created successfully"})
+}
+
+func ValidateEmailHandler(w http.ResponseWriter, r *http.Request) {
+	var req AuthRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+
+	if err := service.ValidateEmailForSignup(r.Context(), req.Email); err != nil {
+		switch {
+		case errors.Is(err, service.ErrInvalidEmail):
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		case errors.Is(err, service.ErrEmailExists):
+			http.Error(w, err.Error(), http.StatusConflict)
+		default:
+			http.Error(w, "Error validating email: "+err.Error(), http.StatusInternalServerError)
+		}
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]bool{"valid": true})
 }
 
 func LoginHandler(w http.ResponseWriter, r *http.Request) {

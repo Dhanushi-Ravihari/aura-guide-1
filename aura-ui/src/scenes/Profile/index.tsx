@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useMemo, useState } from "react";
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import { palette, commonStyles } from "../../theme";
 import { AppCard } from "../../components/AppCard";
@@ -10,6 +10,13 @@ import { ScreenHeader } from "../../components/ScreenHeader";
 import { UserProfile } from "../../types";
 import { Picker } from "@react-native-picker/picker";
 import { api } from "../../api/api";
+import { screenStyles } from "../../styles/screenStyles";
+
+function avgPct(skills: { current_pct?: number }[]) {
+  if (!skills.length) return 0;
+  const sum = skills.reduce((a, s) => a + (typeof s.current_pct === "number" ? s.current_pct : 0), 0);
+  return Math.round(sum / skills.length);
+}
 
 export function ProfileScreen({
   user,
@@ -20,11 +27,34 @@ export function ProfileScreen({
   onNavigateSettings: () => void;
   onProfileUpdated: () => Promise<void>;
 }) {
+  const { width } = useWindowDimensions();
   const [isEditing, setIsEditing] = useState(false);
   const [form, setForm] = useState(user);
+  const [cvItems, setCvItems] = useState<any[]>([]);
+  const [summary, setSummary] = useState<any>({ skills: [], completed_tasks: 0 });
+
   useEffect(() => {
     setForm(user);
   }, [user]);
+
+  useEffect(() => {
+    api.listCVs().then((items) => setCvItems(Array.isArray(items) ? items : [])).catch(() => setCvItems([]));
+  }, []);
+
+  useEffect(() => {
+    api.getGoalSummary().then(setSummary).catch(() => setSummary({ skills: [], completed_tasks: 0 }));
+  }, [user.goalId]);
+
+  const techAvg = useMemo(
+    () => avgPct((summary.skills || []).filter((s: any) => (s.category_name || "").toLowerCase() === "technical")),
+    [summary.skills],
+  );
+  const softAvg = useMemo(
+    () => avgPct((summary.skills || []).filter((s: any) => (s.category_name || "").toLowerCase() === "soft skills")),
+    [summary.skills],
+  );
+
+  const initials = `${(form.firstName || "?").slice(0, 1)}${(form.lastName || "").slice(0, 1)}`.toUpperCase();
 
   const saveProfile = async () => {
     try {
@@ -32,55 +62,65 @@ export function ProfileScreen({
         first_name: form.firstName,
         last_name: form.lastName,
         degree_program: form.degreeProgram,
-        study_year: parseInt(form.studyYear) || 1,
+        study_year: parseInt(form.studyYear, 10) || 1,
         university: form.university,
         technical_skill_level: form.technicalSkillLevel,
         soft_skill_level: form.softSkillLevel,
         availability_type: form.availabilityType,
-        availability_hours: parseInt(form.availabilityHours) || 1,
+        availability_hours: parseInt(form.availabilityHours, 10) || 1,
         goal_id: form.goalId || 1,
       });
       await onProfileUpdated();
       setIsEditing(false);
       Alert.alert("Success", "Profile updated successfully.");
+      api.getGoalSummary().then(setSummary).catch(() => {});
     } catch (error) {
       Alert.alert("Update failed", (error as Error).message);
     }
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.screenContent}>
+    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={screenStyles.scrollContent}>
       <ScreenHeader
         title="Profile"
-        subtitle="Your academic and growth snapshot"
+        subtitle="Your learning identity"
         rightAction={
-          <Pressable onPress={onNavigateSettings} style={styles.iconIconButton}>
-            <Ionicons name="settings-outline" size={20} color={palette.text} />
+          <Pressable onPress={onNavigateSettings} style={styles.roundBtn}>
+            <Ionicons name="settings-outline" size={21} color={palette.text} />
           </Pressable>
         }
       />
 
-      <AppCard style={commonStyles.stackMd}>
-        <View style={styles.profileHeader}>
-          <View style={styles.avatarLarge}>
-            <Ionicons name="person-outline" size={38} color={palette.surface} />
+      <AppCard style={styles.coverCard}>
+        <View style={[styles.coverRow, width < 400 && styles.coverRowStack]}>
+          <View style={styles.avatarRing}>
+            <View style={styles.avatarInner}>
+              <Text style={styles.avatarText}>{initials}</Text>
+            </View>
           </View>
           <View style={commonStyles.flexOne}>
-            <Text style={styles.profileName}>
+            <Text style={styles.displayName}>
               {form.firstName} {form.lastName}
             </Text>
-            <Text style={commonStyles.cardBody}>{form.degreeProgram}</Text>
-            <Text style={commonStyles.cardBody}>{form.university}</Text>
-            <Text style={commonStyles.cardBody}>{form.email}</Text>
+            <Text style={styles.email}>{form.email}</Text>
+            <View style={[styles.miniChips, { marginTop: 10 }]}>
+              <Text style={styles.chip}>{user.goal || "Goal unset"}</Text>
+              <Text style={styles.chip}>{form.degreeProgram || "Degree"}</Text>
+            </View>
           </View>
-          <Pressable onPress={() => setIsEditing((value) => !value)} style={styles.iconIconButton}>
-            <Feather name="edit-2" size={16} color={palette.primary} />
+          <Pressable onPress={() => setIsEditing((v) => !v)} style={styles.roundBtn}>
+            <Feather name="edit-2" size={18} color={palette.primary} />
           </Pressable>
         </View>
-        {isEditing ? (
-          <View style={commonStyles.stackSm}>
+      </AppCard>
+
+      {isEditing ? (
+          <AppCard style={commonStyles.stackSm}>
+            <Text style={styles.sectionLabel}>Edit details</Text>
             <InputField label="First name" placeholder="First name" value={form.firstName} onChangeText={(v) => setForm({ ...form, firstName: v })} />
             <InputField label="Last name" placeholder="Last name" value={form.lastName} onChangeText={(v) => setForm({ ...form, lastName: v })} />
+            <InputField label="University" placeholder="University" value={form.university} onChangeText={(v) => setForm({ ...form, university: v })} />
+
             <PickerField label="Degree Program" selectedValue={form.degreeProgram} onValueChange={(v) => setForm({ ...form, degreeProgram: v })}>
               <Picker.Item label="Select Degree Program" value="" />
               <Picker.Item label="Software Engineering" value="Software Engineering" />
@@ -94,20 +134,20 @@ export function ProfileScreen({
               <Picker.Item label="3rd year" value="3" />
               <Picker.Item label="4th year" value="4" />
             </PickerField>
-            <PickerField label="Your Goal" selectedValue={String(form.goalId || "")} onValueChange={(v) => setForm({ ...form, goalId: parseInt(v) || 1 })}>
+            <PickerField label="Goal" selectedValue={String(form.goalId || "")} onValueChange={(v) => setForm({ ...form, goalId: parseInt(v, 10) || 1 })}>
               <Picker.Item label="Select Goal" value="" />
-              <Picker.Item label="I wanted to be a software engineer" value="1" />
-              <Picker.Item label="I wanted to be a backend developer" value="2" />
-              <Picker.Item label="I wanted to be a QA engineer" value="3" />
-              <Picker.Item label="I wanted to be a DevOps engineer" value="4" />
+              <Picker.Item label="Software Engineer" value="1" />
+              <Picker.Item label="Backend Developer" value="2" />
+              <Picker.Item label="QA Engineer" value="3" />
+              <Picker.Item label="DevOps Engineer" value="4" />
             </PickerField>
-            <PickerField label="Initial technical skill level" selectedValue={form.technicalSkillLevel} onValueChange={(v) => setForm({ ...form, technicalSkillLevel: v })}>
+            <PickerField label="Technical level" selectedValue={form.technicalSkillLevel} onValueChange={(v) => setForm({ ...form, technicalSkillLevel: v })}>
               <Picker.Item label="Select level" value="" />
               <Picker.Item label="Beginner" value="Beginner" />
               <Picker.Item label="Intermediate" value="Intermediate" />
               <Picker.Item label="Advanced" value="Advanced" />
             </PickerField>
-            <PickerField label="Initial soft skill level" selectedValue={form.softSkillLevel} onValueChange={(v) => setForm({ ...form, softSkillLevel: v })}>
+            <PickerField label="Soft skills level" selectedValue={form.softSkillLevel} onValueChange={(v) => setForm({ ...form, softSkillLevel: v })}>
               <Picker.Item label="Select level" value="" />
               <Picker.Item label="Beginner" value="Beginner" />
               <Picker.Item label="Intermediate" value="Intermediate" />
@@ -118,133 +158,258 @@ export function ProfileScreen({
               <Picker.Item label="Daily" value="daily" />
               <Picker.Item label="Weekly" value="weekly" />
             </PickerField>
-            <PickerField label="Time availability (hours)" selectedValue={form.availabilityHours} onValueChange={(v) => setForm({ ...form, availabilityHours: v })}>
+            <PickerField label="Availability (hours)" selectedValue={form.availabilityHours} onValueChange={(v) => setForm({ ...form, availabilityHours: v })}>
               <Picker.Item label="Select hours" value="" />
               {Array.from({ length: 20 }, (_, i) => (
-                <Picker.Item key={i + 1} label={`${i + 1}`} value={`${i + 1}`} />
+                  <Picker.Item key={i + 1} label={`${i + 1}`} value={`${i + 1}`} />
               ))}
             </PickerField>
-            <PrimaryButton label="Update Profile" onPress={saveProfile} />
-          </View>
-        ) : null}
+            <View style={styles.editActions}>
+              <PrimaryButton label="Save Changes" onPress={saveProfile} style={styles.saveBtn} />
+              <Pressable onPress={() => setIsEditing(false)} style={styles.cancelBtn}>
+                <Text style={styles.cancelBtnText}>Cancel</Text>
+              </Pressable>
+            </View>
+          </AppCard>
+      ) : null}
+      
+      <AppCard style={styles.metricsCard}>
+        <Text style={styles.metricsEyebrow}>Momentum</Text>
+        <View style={[styles.metricsGrid, width < 380 && styles.metricsGridStack]}>
+          <Metric icon="sparkles-outline" label="Aura score" value={`${user.currentScore ?? 0}`} tint={palette.primaryMuted} />
+          <Metric icon="checkmark-done-outline" label="Tasks done" value={`${summary.completed_tasks ?? 0}`} tint={palette.success} />
+          <Metric icon="code-slash-outline" label="Technical" value={`${techAvg}%`} tint="#6366F1" />
+          <Metric icon="chatbubbles-outline" label="Soft skills" value={`${softAvg}%`} tint={palette.secondary} />
+        </View>
       </AppCard>
 
-      <AppCard style={styles.primaryBanner}>
-        <Text style={styles.bannerEyebrow}>Summary of the Current score</Text>
-        <Text style={styles.profileScore}>{user.currentScore || 0} pts</Text>
-        <View style={styles.scoreRow}>
-          <View>
-            <Text style={styles.scoreValue}>{user.technicalScore || 0}</Text>
-            <Text style={styles.scoreLabel}>Technical</Text>
-          </View>
-          <View>
-            <Text style={styles.scoreValue}>{user.softSkillScore || 0}</Text>
-            <Text style={styles.scoreLabel}>Soft Skills</Text>
-          </View>
-        </View>
+      <AppCard>
+        <Text style={styles.sectionLabel}>Uploaded CVs</Text>
+        {cvItems.length === 0 ? (
+          <Text style={styles.cvEmpty}>No CV on file yet. Use AI Coach to upload text for feedback.</Text>
+        ) : (
+          cvItems.map((cv: any) => (
+            <View key={`${cv.file_name}-${cv.uploaded_at}`} style={styles.cvRow}>
+              <View style={styles.cvIcon}>
+                <Ionicons name="document-text" size={20} color={palette.primary} />
+              </View>
+              <View style={commonStyles.flexOne}>
+                <Text style={styles.cvFile}>{cv.file_name}</Text>
+                <Text style={styles.cvDate}>{String(cv.uploaded_at).slice(0, 16).replace("T", " · ")}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={palette.muted} />
+            </View>
+          ))
+        )}
       </AppCard>
     </ScrollView>
   );
 }
 
+function Metric({
+  icon,
+  label,
+  value,
+  tint,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  value: string;
+  tint: string;
+}) {
+  return (
+    <View style={styles.metricCell}>
+      <View style={[styles.metricIconBg, { backgroundColor: tint + "22" }]}>
+        <Ionicons name={icon} size={22} color={tint} />
+      </View>
+      <Text style={styles.metricValue}>{value}</Text>
+      <Text style={styles.metricCap}>{label}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  screenContent: {
-    paddingHorizontal: 20,
-    paddingTop: 18,
-    paddingBottom: 24,
-    gap: 16,
-  },
-  iconIconButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
+  roundBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.8)",
+    backgroundColor: "rgba(255,255,255,0.95)",
     borderWidth: 1,
     borderColor: palette.border,
   },
-  profileHeader: {
+  coverCard: {
+    padding: 18,
+    borderLeftWidth: 4,
+    borderLeftColor: palette.primaryMuted,
+    overflow: "hidden",
+  },
+  coverRow: {
     flexDirection: "row",
-    alignItems: "flex-start",
+    alignItems: "center",
     gap: 14,
   },
-  avatarLarge: {
-    width: 78,
-    height: 78,
-    borderRadius: 39,
-    backgroundColor: palette.primary,
+  coverRowStack: {
+    flexWrap: "wrap",
+  },
+  avatarRing: {
+    padding: 3,
+    borderRadius: 22,
+    backgroundColor: "rgba(129,140,248,0.85)",
+  },
+  avatarInner: {
+    width: 72,
+    height: 72,
+    borderRadius: 18,
+    backgroundColor: palette.primaryDark,
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.95)",
   },
-  profileName: {
+  avatarText: {
+    fontSize: 26,
+    fontWeight: "900",
+    color: "#F8FAFC",
+  },
+  displayName: {
     fontSize: 22,
-    fontWeight: "800",
+    fontWeight: "900",
     color: palette.text,
+    letterSpacing: -0.4,
   },
-  helperBox: {
+  email: {
+    marginTop: 4,
+    fontSize: 14,
     color: palette.muted,
-    lineHeight: 21,
-    backgroundColor: "#F8FBFF",
+    fontWeight: "600",
+  },
+  miniChips: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  chip: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: palette.primary,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: palette.chipBlue,
+    overflow: "hidden",
+  },
+  metricsCard: {
+    gap: 14,
+    backgroundColor: "rgba(248,250,252,0.94)",
+    borderColor: palette.border,
+  },
+  metricsEyebrow: {
+    fontWeight: "900",
+    fontSize: 11,
+    color: palette.muted,
+    letterSpacing: 1,
+    textTransform: "uppercase",
+  },
+  metricsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+  metricsGridStack: {
+    flexDirection: "column",
+  },
+  metricCell: {
+    flexGrow: 1,
+    flexBasis: "42%",
+    minWidth: "40%",
+    borderRadius: 16,
+    padding: 12,
+    backgroundColor: palette.surface,
     borderWidth: 1,
     borderColor: palette.border,
-    padding: 12,
-    borderRadius: 14,
-  },
-  primaryBanner: {
-    backgroundColor: palette.primary,
-    borderColor: palette.primary,
-    gap: 8,
-    borderRadius: 22,
-    padding: 18,
-  },
-  bannerEyebrow: {
-    color: "#BFDBFE",
-    fontWeight: "700",
-    textTransform: "uppercase",
-    fontSize: 12,
-    letterSpacing: 0.8,
-  },
-  profileScore: {
-    color: palette.surface,
-    fontSize: 36,
-    fontWeight: "800",
-  },
-  scoreRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 8,
-  },
-  scoreValue: {
-    color: palette.surface,
-    fontSize: 20,
-    fontWeight: "800",
-  },
-  scoreLabel: {
-    color: "#BFDBFE",
-    fontSize: 12,
-    marginTop: 2,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: palette.text,
-  },
-  recommendationRow: {
-    flexDirection: "row",
+    gap: 6,
     alignItems: "flex-start",
-    gap: 10,
   },
-  recommendationIcon: {
-    width: 34,
-    height: 34,
+  metricIconBg: {
+    width: 40,
+    height: 40,
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: palette.chipBlue,
   },
-  actionRow: {
+  metricValue: {
+    fontSize: 20,
+    fontWeight: "900",
+    color: palette.text,
+  },
+  metricCap: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: palette.muted,
+  },
+  sectionLabel: {
+    fontWeight: "900",
+    fontSize: 16,
+    color: palette.text,
+    marginBottom: 12,
+    letterSpacing: -0.2,
+  },
+  cvEmpty: {
+    color: palette.muted,
+    fontSize: 14,
+    lineHeight: 21,
+    fontWeight: "600",
+  },
+  cvRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: palette.border,
+  },
+  cvIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: palette.chipBlue,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cvFile: {
+    fontWeight: "800",
+    color: palette.text,
+    fontSize: 15,
+  },
+  cvDate: {
+    marginTop: 2,
+    fontSize: 12,
+    color: palette.muted,
+    fontWeight: "600",
+  },
+  editActions: {
     flexDirection: "row",
     gap: 12,
+    marginTop: 8,
+  },
+  saveBtn: {
+    flex: 2,
+  },
+  cancelBtn: {
+    flex: 1,
+    height: 52,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: palette.surfaceMuted,
+    borderWidth: 1,
+    borderColor: palette.border,
+  },
+  cancelBtnText: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: palette.muted,
   },
 });

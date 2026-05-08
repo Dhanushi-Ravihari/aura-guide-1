@@ -6,6 +6,7 @@ import { AppCard } from "../../components/AppCard";
 import { InputField } from "../../components/InputField";
 import { PrimaryButton } from "../../components/PrimaryButton";
 import { TextLink } from "../../components/TextLink";
+import { api } from "../../api/api";
 
 export function SignUpScreen({
   onOpenTerms,
@@ -22,8 +23,38 @@ export function SignUpScreen({
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [emailChecked, setEmailChecked] = useState(false);
+  const [checkingEmail, setCheckingEmail] = useState(false);
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-  const handleContinue = () => {
+  const validateEmail = async () => {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!emailPattern.test(normalizedEmail)) {
+      setError("Enter a valid email address.");
+      setEmailChecked(false);
+      return false;
+    }
+
+    try {
+      setCheckingEmail(true);
+      await api.validateSignupEmail(normalizedEmail);
+      setError("");
+      setEmailChecked(true);
+      return true;
+    } catch (err) {
+      const message = (err as Error).message || "Email validation failed";
+      setError(message);
+      setEmailChecked(false);
+      return false;
+    } finally {
+      setCheckingEmail(false);
+    }
+  };
+
+  const handleContinue = async () => {
+    const isEmailValid = emailChecked ? true : await validateEmail();
+    if (!isEmailValid) return;
+
     if (!email || !password || !confirmPassword) {
       setError("Fill in all fields before continuing.");
       return;
@@ -40,7 +71,7 @@ export function SignUpScreen({
     }
 
     setError("");
-    onContinue(email, password);
+    onContinue(email.trim().toLowerCase(), password);
   };
 
   return (
@@ -58,7 +89,11 @@ export function SignUpScreen({
           label="Email"
           placeholder="you@university.edu"
           value={email}
-          onChangeText={setEmail}
+          onChangeText={(value) => {
+            setEmail(value);
+            setEmailChecked(false);
+            if (error) setError("");
+          }}
           keyboardType="email-address"
           icon={<Feather name="mail" size={18} color={palette.muted} />}
         />
@@ -67,7 +102,12 @@ export function SignUpScreen({
           label="Password"
           placeholder="Create a strong password"
           value={password}
-          onChangeText={setPassword}
+          onChangeText={async (value) => {
+            if (!emailChecked && !checkingEmail) {
+              await validateEmail();
+            }
+            setPassword(value);
+          }}
           secureTextEntry={!showPassword}
           icon={<Feather name="lock" size={18} color={palette.muted} />}
         />
@@ -95,7 +135,10 @@ export function SignUpScreen({
 
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-        <PrimaryButton label="Create Account" onPress={handleContinue} />
+        <View style={styles.actionsRow}>
+          <PrimaryButton label="Back" onPress={onOpenSignIn} secondary />
+          <PrimaryButton label={checkingEmail ? "Checking..." : "Create Account"} onPress={handleContinue} disabled={checkingEmail} />
+        </View>
       </AppCard>
 
       <View style={styles.authFooter}>
@@ -183,5 +226,9 @@ const styles = StyleSheet.create({
   errorText: {
     color: palette.danger,
     fontWeight: "600",
+  },
+  actionsRow: {
+    flexDirection: "row",
+    gap: 12,
   },
 });

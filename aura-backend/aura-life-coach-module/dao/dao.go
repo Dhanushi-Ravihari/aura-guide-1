@@ -151,3 +151,18 @@ func GetCVFeedback(email string) ([]string, error) {
 	}
 	return append([]string{"Prioritize the top two improvements before your next application."}, stored.Analysis.Improvements...), nil
 }
+
+func ListCVs(email string) []auralifecoach.CVMeta {
+	cvStoreMu.RLock()
+	stored, ok := cvStore[email]
+	cvStoreMu.RUnlock()
+	if !ok {
+		return []auralifecoach.CVMeta{}
+	}
+	return []auralifecoach.CVMeta{
+		{
+			FileName:   stored.FileName,
+			UploadedAt: stored.Uploaded,
+		},
+	}
+}

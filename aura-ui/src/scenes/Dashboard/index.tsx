@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { palette, commonStyles } from "../../theme";
 import { AppCard } from "../../components/AppCard";
@@ -8,12 +8,8 @@ import { ProgressBar } from "../../components/ProgressBar";
 import { ScreenHeader } from "../../components/ScreenHeader";
 import { TextLink } from "../../components/TextLink";
 import { UserProfile, Route } from "../../types";
-import {
-  dashboardStats,
-  todayPlan,
-  recommendations,
-} from "../../../src-native/mockData";
 import { api } from "../../api/api";
+import { screenStyles } from "../../styles/screenStyles";
 
 function formatToday() {
   return new Date().toLocaleDateString("en-US", {
@@ -23,28 +19,18 @@ function formatToday() {
   });
 }
 
-function getPriorityColors(priority: "High" | "Medium" | "Low") {
-  switch (priority) {
-    case "High":
-      return { backgroundColor: "#FEE2E2", textColor: palette.danger };
-    case "Medium":
-      return { backgroundColor: palette.chipYellow, textColor: palette.warning };
-    default:
-      return { backgroundColor: palette.chipGreen, textColor: palette.success };
-  }
+function taskStatusLabel(status: string | undefined) {
+  const s = (status || "").toLowerCase();
+  if (s === "completed") return "Done";
+  if (s === "in_progress") return "In progress";
+  return "To do";
 }
 
-function getCategoryColor(category: string) {
-  if (category === "Technical") {
-    return { backgroundColor: palette.chipPurple, textColor: palette.secondary };
-  }
-  if (category === "Academic") {
-    return { backgroundColor: palette.chipBlue, textColor: palette.primary };
-  }
-  if (category === "Soft Skills") {
-    return { backgroundColor: "#FCE7F3", textColor: "#BE185D" };
-  }
-  return { backgroundColor: palette.surfaceMuted, textColor: palette.muted };
+function taskProgress(status: string | undefined) {
+  const s = (status || "").toLowerCase();
+  if (s === "completed") return 100;
+  if (s === "in_progress") return 55;
+  return 18;
 }
 
 export function DashboardScreen({
@@ -56,21 +42,61 @@ export function DashboardScreen({
   onNavigate: (route: Route) => void;
   onSignOut: () => void;
 }) {
+  const { width } = useWindowDimensions();
   const [tasks, setTasks] = useState<any[]>([]);
+  const [todayPlan, setTodayPlan] = useState<any[]>([]);
+  const [dayStreak, setDayStreak] = useState(1);
+  const [score, setScore] = useState(user.currentScore || 0);
+  const [reminder, setReminder] = useState("");
+  const [quote, setQuote] = useState("");
+
   const safeDate = (value: any) => (typeof value === "string" ? value : "");
 
   useEffect(() => {
     api
-      .getTasks()
-      .then((data) => setTasks(Array.isArray(data) ? data : []))
-      .catch(() => setTasks([]));
+      .getDashboardSummary()
+      .then((data) => {
+        setTasks(Array.isArray(data.ongoing_tasks) ? data.ongoing_tasks : []);
+        setTodayPlan(Array.isArray(data.todays_plan) ? data.todays_plan : []);
+        setDayStreak(typeof data.day_streak === "number" ? data.day_streak : 1);
+        setScore(typeof data.current_score === "number" ? data.current_score : 0);
+      })
+      .catch(() => {
+        setTasks([]);
+        setTodayPlan([]);
+        setDayStreak(1);
+        setScore(user.currentScore || 0);
+      });
+  }, [user.currentScore]);
+
+  useEffect(() => {
+    Promise.all([api.getDailyTaskReminder().catch(() => ({ message: "" })), api.getMotivationalQuote().catch(() => ({ message: "" }))]).then(([r, q]) => {
+      setReminder(typeof r.message === "string" ? r.message : "");
+      setQuote(typeof q.message === "string" ? q.message : "");
+    });
   }, []);
 
+  const coachBody =
+    (user.recommendation && user.recommendation.trim()) ||
+    reminder ||
+    quote ||
+    "Your plan updates as you complete tasks. Open Tasks to keep momentum.";
+
+  const coachSupporting =
+    user.recommendation?.trim() && reminder && reminder !== user.recommendation ? reminder : user.recommendation?.trim() && quote ? quote : "";
+
+  const name = user.firstName?.trim() || "there";
+
   return (
-    <ScrollView contentContainerStyle={styles.screenContent}>
+    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={screenStyles.scrollContent}>
       <ScreenHeader
-        title={`Welcome back, ${user.firstName}!`}
+        title={`Welcome back,\n${name}!`}
         subtitle={formatToday()}
+        leftAction={
+          <View style={styles.headerLogo}>
+            <Ionicons name="sparkles" size={18} color="#FFFFFF" />
+          </View>
+        }
         rightAction={
           <View style={styles.headerActions}>
             <Pressable onPress={() => onNavigate("notifications")} style={styles.iconButton}>
@@ -83,276 +109,362 @@ export function DashboardScreen({
         }
       />
 
-      <View style={styles.statsRow}>
-        {dashboardStats.filter((item) => item.label !== "Active Goals").map((item) => (
-          <AppCard key={item.label} style={styles.metricCard}>
-            <Ionicons name={item.icon as any} size={24} color={item.color} />
-            <Text style={styles.metricValue}>{item.value}</Text>
-            <Text style={styles.metricLabel}>{item.label}</Text>
-          </AppCard>
-        ))}
-      </View>
-
-      <View style={commonStyles.stackMd}>
-        <AppCard style={commonStyles.stackSm}>
-          <Text style={styles.sectionTitle}>Current career goal</Text>
-          <Text style={commonStyles.cardBodyStrong}>{user.goal}</Text>
-        </AppCard>
-
-        <AppCard style={styles.primaryBanner}>
-          <Text style={styles.bannerEyebrow}>AURA says...</Text>
-          <Text style={styles.bannerBody}>
-            Keep up the momentum. Your technical skills improved this week, so today is a good day to push on a more
-            challenging problem.
-          </Text>
-        </AppCard>
-
-        <AppCard style={commonStyles.stackMd}>
-          <View style={styles.sectionHeadingRow}>
-            <Text style={styles.sectionTitle}>Quick actions</Text>
-          </View>
-          <View style={commonStyles.stackSm}>
-            <Pressable style={styles.quickAction} onPress={() => onNavigate("calendar")}>
-              <View style={styles.quickActionIcon}>
-                <Ionicons name="calendar-outline" size={18} color={palette.primary} />
-              </View>
-              <View style={commonStyles.flexOne}>
-                <Text style={styles.quickActionTitle}>Calendar</Text>
-                <Text style={styles.quickActionSubtitle}>View your schedule and upcoming events</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={palette.muted} />
-            </Pressable>
-
-            <Pressable style={styles.quickAction} onPress={() => onNavigate("careerTrack")}>
-              <View style={styles.quickActionIcon}>
-                <Ionicons name="rocket-outline" size={18} color={palette.primary} />
-              </View>
-              <View style={commonStyles.flexOne}>
-                <Text style={styles.quickActionTitle}>Career track plan</Text>
-                <Text style={styles.quickActionSubtitle}>Review your personalized roadmap</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={palette.muted} />
-            </Pressable>
-            <View style={styles.quickButtonRow}>
-              <Pressable style={styles.quickButton} onPress={() => onNavigate("aiCoach")}>
-                <Text style={styles.quickButtonText}>Go to Chat</Text>
-              </Pressable>
-              <Pressable style={styles.quickButton} onPress={() => onNavigate("tasks")}>
-                <Text style={styles.quickButtonText}>View Tasks</Text>
-              </Pressable>
+      <View style={[styles.statsRow, width < 360 && styles.statsRowStack]}>
+        <AppCard style={styles.metricCard}>
+          <View style={styles.metricContent}>
+            <View>
+              <Text style={styles.metricValue}>{score}</Text>
+              <Text style={styles.metricLabel}>Aura Score</Text>
+            </View>
+            <View style={[styles.metricIconWrap, { backgroundColor: palette.chipYellow }]}>
+              <Ionicons name="trophy" size={28} color={palette.warning} />
             </View>
           </View>
         </AppCard>
-
-        <AppCard style={commonStyles.stackMd}>
-          <Text style={styles.sectionTitle}>AURA recommendations</Text>
-          <Text style={commonStyles.cardBodyStrong}>{recommendations[0]?.title}</Text>
-          <Text style={commonStyles.cardBody}>{recommendations[0]?.reason}</Text>
-        </AppCard>
-
-        <AppCard style={commonStyles.stackMd}>
-          <View style={styles.sectionHeadingRow}>
-            <Text style={styles.sectionTitle}>Today's plan</Text>
-            <TextLink label="See calendar" onPress={() => onNavigate("calendar")} />
-          </View>
-          <View style={commonStyles.stackSm}>
-            {todayPlan.map((item) => (
-              <View key={`${item.time}-${item.task}`} style={styles.timelineRow}>
-                <View style={[styles.timelineDot, item.completed ? styles.timelineDotDone : undefined]} />
-                <View style={commonStyles.flexOne}>
-                  <Text style={[styles.timelineTask, item.completed ? styles.timelineTaskDone : undefined]}>{item.task}</Text>
-                  <Text style={styles.timelineTime}>{item.time}</Text>
-                </View>
-              </View>
-            ))}
+        <AppCard style={styles.metricCard}>
+          <View style={styles.metricContent}>
+            <View>
+              <Text style={styles.metricValue}>{dayStreak}</Text>
+              <Text style={styles.metricLabel}>Day Streak</Text>
+            </View>
+            <View style={[styles.metricIconWrap, { backgroundColor: palette.chipGreen }]}>
+              <Ionicons name="flame" size={28} color={palette.success} />
+            </View>
           </View>
         </AppCard>
-
-        <View style={styles.sectionHeadingRow}>
-          <Text style={styles.sectionTitle}>Ongoing tasks</Text>
-          <TextLink label="Open planner" onPress={() => onNavigate("tasks")} />
-        </View>
-
-        {tasks.slice(0, 5).map((task) => {
-          const priority = getPriorityColors(task.priority as any);
-          const category = getCategoryColor(task.category || "Technical");
-
-          return (
-            <AppCard key={task.id} style={commonStyles.stackMd}>
-              <View style={styles.cardHeaderSpace}>
-                <View style={commonStyles.flexOne}>
-                  <Text style={commonStyles.cardTitle}>{task.task}</Text>
-                  <Text style={commonStyles.cardBody}>{task.status}</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={18} color={palette.muted} />
-              </View>
-
-              <View style={commonStyles.badgeRow}>
-                <Badge label={task.category || "Technical"} backgroundColor={category.backgroundColor} textColor={category.textColor} />
-                <Badge label={task.priority || "Medium"} backgroundColor={priority.backgroundColor} textColor={priority.textColor} />
-              </View>
-
-              <View style={commonStyles.progressSummaryRow}>
-                <Text style={commonStyles.helperText}>{task.status}</Text>
-                <Text style={commonStyles.helperText}>
-                  {(safeDate(task.end_date_time) || safeDate(task.start_date_time)).slice(0, 10)}
-                </Text>
-              </View>
-              <ProgressBar value={task.status === "completed" ? 100 : task.status === "in_progress" ? 60 : 15} />
-            </AppCard>
-          );
-        })}
       </View>
+
+      <AppCard style={styles.goalCard}>
+        <View style={styles.goalHeader}>
+          <View style={styles.goalIcon}>
+            <Ionicons name="rocket" size={20} color={palette.primary} />
+          </View>
+          <Text style={styles.eyebrow}>Career Track</Text>
+        </View>
+        <Text style={styles.goalTitle}>{user.goal || "Set your goal in Profile"}</Text>
+      </AppCard>
+
+      <AppCard style={styles.coachCard}>
+        <View style={styles.coachHeader}>
+          <Ionicons name="bulb" size={20} color="#FBBF24" />
+          <Text style={styles.coachEyebrow}>Insights for you</Text>
+        </View>
+        <Text style={styles.coachBody}>{coachBody}</Text>
+        {coachSupporting ? <Text style={styles.coachSupport}>{coachSupporting}</Text> : null}
+      </AppCard>
+
+      <View style={styles.sectionHeadingRow}>
+        <Text style={styles.sectionTitle}>Quick Actions</Text>
+      </View>
+      <View style={styles.quickActionsGrid}>
+        <Pressable style={({ pressed }) => [styles.quickAction, pressed && styles.quickPressed]} onPress={() => onNavigate("calendar")}>
+          <View style={[styles.quickIconOuter, { backgroundColor: palette.chipBlue }]}>
+            <Ionicons name="calendar" size={24} color={palette.primary} />
+          </View>
+          <Text style={styles.quickTitle}>Calendar</Text>
+        </Pressable>
+        <Pressable style={({ pressed }) => [styles.quickAction, pressed && styles.quickPressed]} onPress={() => onNavigate("aiCoach")}>
+          <View style={[styles.quickIconOuter, { backgroundColor: palette.chipPurple }]}>
+            <Ionicons name="chatbubbles" size={24} color={palette.secondary} />
+          </View>
+          <Text style={styles.quickTitle}>AI Coach</Text>
+        </Pressable>
+      </View>
+
+      <AppCard style={commonStyles.stackMd}>
+        <View style={styles.sectionHeadingRow}>
+          <Text style={styles.sectionTitle}>Today's Plan</Text>
+        </View>
+        <View style={commonStyles.stackSm}>
+          {todayPlan.length === 0 ? (
+            <Text style={styles.emptyMuted}>Nothing scheduled today yet. Add tasks from the Tasks tab.</Text>
+          ) : null}
+          {todayPlan.map((item) => (
+            <View key={`${item.id}-${item.task}`} style={styles.timelineRow}>
+              <View style={[styles.timelineLine, item.status === "completed" && styles.timelineLineDone]} />
+              <View style={commonStyles.flexOne}>
+                <Text style={[styles.timelineTask, item.status === "completed" && styles.timelineTaskDone]}>{item.task}</Text>
+                <View style={styles.timelineMetaRow}>
+                  <Ionicons name="time-outline" size={12} color={palette.muted} />
+                  <Text style={styles.timelineMeta}>
+                    {safeDate(item.start_date_time).slice(11, 16) ? safeDate(item.start_date_time).slice(11, 16) + " · " : ""}
+                    {taskStatusLabel(item.status)}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          ))}
+        </View>
+      </AppCard>
+
+      <View style={styles.sectionHeadingRow}>
+        <Text style={styles.sectionTitle}>Ongoing Tasks</Text>
+        <TextLink label="View all" onPress={() => onNavigate("tasks")} />
+      </View>
+
+      {tasks.length === 0 ? (
+        <AppCard variant="muted">
+          <Text style={styles.emptyMuted}>You're all caught up on active tasks!</Text>
+        </AppCard>
+      ) : null}
+
+      {tasks.slice(0, 5).map((task) => (
+        <AppCard key={task.id} style={styles.taskCard}>
+          <View style={styles.taskRow}>
+            <View style={commonStyles.flexOne}>
+              <Text style={commonStyles.cardTitle} numberOfLines={2}>{task.task}</Text>
+              <View style={[commonStyles.badgeRow, styles.taskBadges]}>
+                {task.is_custom ? (
+                  <Badge
+                    label="Personal"
+                    backgroundColor={palette.chipGreen}
+                    textColor={palette.accent}
+                  />
+                ) : null}
+                <Badge label={taskStatusLabel(task.status)} backgroundColor={palette.surfaceMuted} textColor={palette.muted} />
+              </View>
+            </View>
+          </View>
+          <View style={styles.progressContainer}>
+            <ProgressBar value={taskProgress(task.status)} />
+          </View>
+          <View style={styles.taskFooter}>
+            <Ionicons name="calendar-outline" size={12} color={palette.muted} />
+            <Text style={styles.taskDate}>
+              {safeDate(task.start_date_time).slice(0, 10)}
+              {safeDate(task.end_date_time) ? ` → ${safeDate(task.end_date_time).slice(0, 10)}` : ""}
+            </Text>
+          </View>
+        </AppCard>
+      ))}
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  screenContent: {
-    paddingHorizontal: 20,
-    paddingTop: 18,
-    paddingBottom: 24,
-    gap: 16,
-  },
   headerActions: {
     flexDirection: "row",
     gap: 8,
   },
-  iconButton: {
-    width: 38,
-    height: 38,
+  headerLogo: {
+    width: 42,
+    height: 42,
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.8)",
+    backgroundColor: palette.primary,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
+  },
+  iconButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: palette.surface,
     borderWidth: 1,
     borderColor: palette.border,
   },
   statsRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
     gap: 12,
+  },
+  statsRowStack: {
+    flexDirection: "column",
   },
   metricCard: {
     flex: 1,
-    minWidth: 100,
+    padding: 16,
+  },
+  metricContent: {
+    flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
-    gap: 6,
+  },
+  metricIconWrap: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
   },
   metricValue: {
     fontSize: 24,
-    fontWeight: "800",
+    fontWeight: "900",
     color: palette.text,
   },
   metricLabel: {
-    textAlign: "center",
     color: palette.muted,
     fontSize: 12,
-  },
-  primaryBanner: {
-    backgroundColor: palette.primary,
-    borderColor: palette.primary,
-    gap: 8,
-    borderRadius: 22,
-    borderWidth: 1,
-    padding: 18,
-  },
-  bannerEyebrow: {
-    color: "#BFDBFE",
     fontWeight: "700",
-    textTransform: "uppercase",
-    fontSize: 12,
-    letterSpacing: 0.8,
+    marginTop: 2,
   },
-  bannerBody: {
-    color: palette.surface,
-    lineHeight: 22,
+  goalCard: {
+    gap: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: palette.primary,
+  },
+  goalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  goalIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: palette.chipBlue,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  eyebrow: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: palette.primary,
+    textTransform: "uppercase",
+    letterSpacing: 1,
+  },
+  goalTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: palette.text,
+  },
+  coachCard: {
+    backgroundColor: palette.primaryDark,
+    borderColor: "rgba(255,255,255,0.1)",
+    gap: 12,
+  },
+  coachHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  coachEyebrow: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "rgba(255,255,255,0.7)",
+    textTransform: "uppercase",
+    letterSpacing: 1,
+  },
+  coachBody: {
     fontSize: 16,
+    lineHeight: 24,
+    fontWeight: "600",
+    color: "#FFFFFF",
+  },
+  coachSupport: {
+    fontSize: 14,
+    lineHeight: 21,
+    color: "rgba(255,255,255,0.6)",
+    fontWeight: "500",
   },
   sectionHeadingRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 12,
+    marginTop: 12,
+    marginBottom: 8,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: "800",
+    fontSize: 20,
+    fontWeight: "900",
     color: palette.text,
+    letterSpacing: -0.5,
+  },
+  quickActionsGrid: {
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 8,
   },
   quickAction: {
-    flexDirection: "row",
+    flex: 1,
     alignItems: "center",
-    gap: 12,
-    padding: 14,
-    borderRadius: 16,
-    backgroundColor: "#F8FBFF",
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    backgroundColor: palette.surface,
     borderWidth: 1,
     borderColor: palette.border,
+    gap: 10,
   },
-  quickActionIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    backgroundColor: palette.chipBlue,
+  quickPressed: {
+    opacity: 0.8,
+    transform: [{ scale: 0.98 }],
+  },
+  quickIconOuter: {
+    width: 56,
+    height: 56,
+    borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
   },
-  quickActionTitle: {
-    fontWeight: "700",
+  quickTitle: {
+    fontWeight: "800",
+    fontSize: 14,
     color: palette.text,
-  },
-  quickActionSubtitle: {
-    color: palette.muted,
-    marginTop: 2,
-  },
-  quickButtonRow: {
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 6,
-  },
-  quickButton: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 10,
-    alignItems: "center",
-    backgroundColor: palette.primary,
-  },
-  quickButtonText: {
-    color: palette.surface,
-    fontWeight: "700",
   },
   timelineRow: {
     flexDirection: "row",
-    gap: 12,
-    alignItems: "flex-start",
+    gap: 16,
+    alignItems: "stretch",
+    paddingVertical: 4,
   },
-  timelineDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginTop: 5,
-    backgroundColor: "#CBD5E1",
+  timelineLine: {
+    width: 4,
+    borderRadius: 4,
+    backgroundColor: palette.chipBlue,
+    minHeight: 40,
   },
-  timelineDotDone: {
+  timelineLineDone: {
     backgroundColor: palette.success,
   },
   timelineTask: {
     fontWeight: "700",
+    fontSize: 15,
     color: palette.text,
   },
   timelineTaskDone: {
     color: palette.muted,
     textDecorationLine: "line-through",
   },
-  timelineTime: {
-    marginTop: 2,
-    color: palette.muted,
-  },
-  cardHeaderSpace: {
+  timelineMetaRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    gap: 12,
+    alignItems: "center",
+    gap: 4,
+    marginTop: 4,
+  },
+  timelineMeta: {
+    fontSize: 12,
+    color: palette.muted,
+    fontWeight: "600",
+  },
+  emptyMuted: {
+    color: palette.muted,
+    textAlign: "center",
+    paddingVertical: 12,
+  },
+  taskCard: {
+    marginBottom: 12,
+  },
+  taskRow: {
+    marginBottom: 8,
+  },
+  taskBadges: {
+    marginTop: 8,
+  },
+  progressContainer: {
+    marginVertical: 12,
+  },
+  taskFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 4,
+  },
+  taskDate: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: palette.muted,
   },
 });

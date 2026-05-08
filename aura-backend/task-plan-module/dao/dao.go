@@ -113,6 +113,7 @@ func GetTaskPlan(ctx context.Context, email string) ([]taskplan.Task, error) {
 		if err := rows.Scan(&task.ID, &task.SkillID, &task.Task, &task.Status, &task.StartDateTime, &task.EndDateTime); err != nil {
 			return nil, err
 		}
+		task.IsCustom = task.SkillID == nil
 		tasks = append(tasks, task)
 	}
 	return tasks, rows.Err()
@@ -158,6 +159,9 @@ func UpdateTask(ctx context.Context, email string, taskID int, req taskplan.Upda
 		record.EndDateTime = req.EndDateTime
 	}
 	if req.Status != nil {
+		if record.SkillID != nil {
+			return fmt.Errorf("status updates for generated tasks are managed by the agent")
+		}
 		statusID, err := getStatusID(ctx, *req.Status)
 		if err != nil {
 			return err
@@ -242,6 +246,7 @@ func AddTask(ctx context.Context, email string, req taskplan.AddTaskRequest) (*t
 	return &taskplan.Task{
 		ID:            record.ID,
 		SkillID:       record.SkillID,
+		IsCustom:      record.SkillID == nil,
 		Task:          record.Task,
 		Status:        statusName,
 		StartDateTime: record.StartDateTime,

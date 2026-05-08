@@ -151,6 +151,20 @@ CREATE TABLE user_notification (
    is_read BOOLEAN
 );
 
+-- USER CV
+CREATE TABLE user_cv (
+    id SERIAL PRIMARY KEY,
+    user_id INT NOT NULL REFERENCES user_student(id),
+    file_name VARCHAR(255) NOT NULL,
+    file_path TEXT NOT NULL,
+    file_size BIGINT,
+    mime_type VARCHAR(100) DEFAULT 'application/pdf',
+    uploaded_at TIMESTAMP DEFAULT NOW(),
+    extracted_text TEXT,
+    strengths TEXT,
+    improvements TEXT,
+);
+
 -- SEED DATA
 INSERT INTO status (name) VALUES ('pending'), ('in_progress'), ('completed'), ('abandoned');
 

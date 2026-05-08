@@ -52,3 +52,18 @@ func GetCompletedTasksHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(result)
 }
+
+func GetDashboardSummaryHandler(w http.ResponseWriter, r *http.Request) {
+	email, ok := r.Context().Value(middleware.UserEmailKey).(string)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	result, err := service.GetDashboardSummary(r.Context(), email)
+	if err != nil {
+		http.Error(w, "Error fetching dashboard summary", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(result)
+}

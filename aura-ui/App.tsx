@@ -1,3 +1,4 @@
+import "react-native-gesture-handler";
 import React, { useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
@@ -31,10 +32,10 @@ import { TermsScreen } from "./src/scenes/Terms";
 import { api } from "./src/api/api";
 
 const goalIdToLabel: Record<number, string> = {
-  1: "I wanted to be a software engineer",
-  2: "I wanted to be a backend developer",
-  3: "I wanted to be a QA engineer",
-  4: "I wanted to be a DevOps engineer",
+  1: "Software Engineer",
+  2: "Backend Developer",
+  3: "QA Engineer",
+  4: "DevOps Engineer",
 };
 
 export default function App() {
@@ -66,9 +67,10 @@ export default function App() {
         softSkillLevel: profileData.soft_skill_level || "",
         availabilityType: profileData.availability_type || "",
         availabilityHours: profileData.availability_hours ? String(profileData.availability_hours) : "",
-        goal: goalIdToLabel[profileData.goal_id || 1] || "I wanted to be a software engineer",
+        goal: goalIdToLabel[profileData.goal_id || 1] || "Software Engineer",
         goalId: profileData.goal_id || 1,
-        currentScore: score.current_score || 0,
+        currentScore: score.current_score ?? profileData.current_score ?? 0,
+        recommendation: profileData.recommendation ?? "",
         joinedDate: initialProfile.joinedDate,
       });
       return true;
@@ -114,10 +116,12 @@ export default function App() {
 
   const handleOnboardingComplete = async (profile: any) => {
     try {
-      // profile already contains all fields + password
       await api.signup(profile);
-      alert("Signup successful! Please sign in with your credentials.");
-      setRoute("signin");
+      await api.login({ email: profile.email, password: profile.password });
+      const ok = await fetchProfile();
+      if (ok) {
+        setRoute("dashboard");
+      }
     } catch (err) {
       alert("Signup failed: " + (err as Error).message);
     }
@@ -129,8 +133,13 @@ export default function App() {
     setTab("dashboard");
   };
 
+  useEffect(() => {
+    const { setTheme } = require("./src/theme");
+    setTheme(settings.darkMode);
+  }, [settings.darkMode]);
+
   const activeRoute = tabRoutes.includes(route as any) ? tab : route;
-  const appBg = settings.darkMode ? "#0B1220" : palette.background;
+  const appBg = settings.darkMode ? "#0F172A" : "#F8FAFC";
 
   const renderContent = () => {
     switch (activeRoute) {
@@ -159,7 +168,12 @@ export default function App() {
         return <ResetPasswordScreen onBack={() => setRoute("signin")} />;
       case "onboarding":
         return (
-          <OnboardingScreen initialEmail={user.email} initialPassword={tempPassword} onComplete={handleOnboardingComplete} />
+          <OnboardingScreen
+            initialEmail={user.email}
+            initialPassword={tempPassword}
+            onBack={() => setRoute("signup")}
+            onComplete={handleOnboardingComplete}
+          />
         );
       case "dashboard":
         return <DashboardScreen user={user} onNavigate={setRoute} onSignOut={handleSignOut} />;
@@ -216,7 +230,7 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <View style={styles.container}>
-        <StatusBar style="dark" />
+        <StatusBar style={settings.darkMode ? "light" : "dark"} />
         <SafeAreaView style={[styles.safeArea, { backgroundColor: appBg }]} edges={["top", "left", "right"]}>
           {renderContent()}
         </SafeAreaView>
@@ -229,7 +243,6 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: palette.background,
   },
   safeArea: {
     flex: 1,

@@ -13,10 +13,12 @@ import { initialProfile } from "../../constants";
 export function OnboardingScreen({
   initialEmail,
   initialPassword,
+  onBack,
   onComplete,
 }: {
   initialEmail: string;
   initialPassword?: string;
+  onBack: () => void;
   onComplete: (profile: any) => void;
 }) {
   const [step, setStep] = useState(1);
@@ -56,13 +58,13 @@ export function OnboardingScreen({
           <View style={commonStyles.stackMd}>
             <InputField label="First Name" placeholder="Enter your first name" value={firstName} onChangeText={setFirstName} />
             <InputField label="Last Name" placeholder="Enter your last name" value={lastName} onChangeText={setLastName} />
-            <InputField
-              label="Email"
-              placeholder="you@university.edu"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-            />
+            {/*<InputField*/}
+            {/*  label="Email"*/}
+            {/*  placeholder="you@university.edu"*/}
+            {/*  value={email}*/}
+            {/*  onChangeText={setEmail}*/}
+            {/*  keyboardType="email-address"*/}
+            {/*/>*/}
           </View>
         ) : (
           <View style={commonStyles.stackMd}>
@@ -97,10 +99,10 @@ export function OnboardingScreen({
               onValueChange={(itemValue) => setGoal(itemValue)}
             >
               <Picker.Item label="Select Goal" value="" />
-              <Picker.Item label="I wanted to be a software engineer" value="1" />
-              <Picker.Item label="I wanted to be a backend developer" value="2" />
-              <Picker.Item label="I wanted to be a QA engineer" value="3" />
-              <Picker.Item label="I wanted to be a DevOps engineer" value="4" />
+              <Picker.Item label="Software Engineer" value="1" />
+              <Picker.Item label="Backend Developer" value="2" />
+              <Picker.Item label="QA Engineer" value="3" />
+              <Picker.Item label="DevOps Engineer" value="4" />
             </PickerField>
             <PickerField label="Initial technical skill level" selectedValue={technicalSkillLevel} onValueChange={(itemValue) => setTechnicalSkillLevel(itemValue)}>
               <Picker.Item label="Select level" value="" />
@@ -129,7 +131,7 @@ export function OnboardingScreen({
         )}
 
         <View style={styles.actionRow}>
-          {step > 1 ? <PrimaryButton label="Back" onPress={() => setStep(1)} secondary /> : null}
+          <PrimaryButton label="Back" onPress={() => (step > 1 ? setStep(1) : onBack())} secondary />
           <PrimaryButton
             label={step === 1 ? "Next" : "Complete Setup"}
             onPress={() => {
@@ -139,8 +141,8 @@ export function OnboardingScreen({
               }
 
               onComplete({
-                firstName,
-                lastName,
+                first_name: firstName,
+                last_name: lastName,
                 email,
                 password: initialPassword,
                 university,

@@ -43,3 +43,7 @@ func GetCVFeedback(email string) (*auralifecoach.FeedbackResponse, error) {
 	}
 	return &auralifecoach.FeedbackResponse{Topic: "CV Feedback", Feedback: feedback}, nil
 }
+
+func ListCVs(email string) []auralifecoach.CVMeta {
+	return dao.ListCVs(email)
+}

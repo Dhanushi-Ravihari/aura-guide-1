@@ -9,3 +9,7 @@ import (
 func GetGoals(ctx context.Context) ([]goal.Goal, error) {
 	return dao.GetAllGoals(ctx)
 }
+
+func GetGoalSummary(ctx context.Context, email string) (*goal.GoalSummaryResponse, error) {
+	return dao.GetGoalSummaryByEmail(ctx, email)
+}

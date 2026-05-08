@@ -1,95 +1,278 @@
-import React from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useMemo, useState } from "react";
+import { ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { palette, commonStyles } from "../../theme";
 import { AppCard } from "../../components/AppCard";
 import { ProgressBar } from "../../components/ProgressBar";
 import { ScreenHeader } from "../../components/ScreenHeader";
-import {
-  technicalSkills,
-  softSkills,
-} from "../../../src-native/mockData";
+import { api } from "../../api/api";
+import { screenStyles } from "../../styles/screenStyles";
 
 export function GoalsScreen() {
+  const { width } = useWindowDimensions();
+  const [summary, setSummary] = useState<any>({ completed_tasks: 0, skills: [], career_title: "" });
+
+  useEffect(() => {
+    api
+      .getGoalSummary()
+      .then((data) => setSummary(data || { completed_tasks: 0, skills: [], career_title: "" }))
+      .catch(() => setSummary({ completed_tasks: 0, skills: [], career_title: "" }));
+  }, []);
+
+  const technicalSkills = useMemo(
+    () => (summary.skills || []).filter((skill: any) => (skill.category_name || "").toLowerCase() === "technical"),
+    [summary.skills],
+  );
+  const softSkills = useMemo(
+    () => (summary.skills || []).filter((skill: any) => (skill.category_name || "").toLowerCase() === "soft skills"),
+    [summary.skills],
+  );
+
+  const techAvg = useMemo(() => avgPct(technicalSkills), [technicalSkills]);
+  const softAvg = useMemo(() => avgPct(softSkills), [softSkills]);
+
   return (
-    <ScrollView contentContainerStyle={styles.screenContent}>
-      <ScreenHeader title="Goals & Progress" subtitle="Track your milestones and skill growth" />
+    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[screenStyles.scrollContent, { backgroundColor: palette.background }]}>
+      <ScreenHeader title="Goals & Skills" subtitle="Your professional roadmap" />
 
-      <View style={styles.statsRow}>
-        {[
-          { label: "Tasks Done", value: "12" },
-          { label: "Streak", value: "14" },
-        ].map((item) => (
-          <AppCard key={item.label} style={styles.smallMetricCard}>
-            <Text style={styles.smallMetricValue}>{item.value}</Text>
-            <Text style={styles.smallMetricLabel}>{item.label}</Text>
-          </AppCard>
-        ))}
-      </View>
-
-      <AppCard style={commonStyles.stackMd}>
-        <Text style={styles.sectionTitle}>Technical skills</Text>
-        <View style={commonStyles.stackMd}>
-          {technicalSkills.map((skill) => (
-            <View key={skill.name} style={commonStyles.stackXs}>
-              <View style={commonStyles.progressSummaryRow}>
-                <Text style={commonStyles.cardBodyStrong}>{skill.name}</Text>
-                <Text style={commonStyles.helperText}>{skill.level}%</Text>
-              </View>
-              <ProgressBar value={skill.level} />
-            </View>
-          ))}
+      <AppCard style={styles.hero}>
+        <View style={styles.heroTop}>
+          <View style={styles.heroIconWrap}>
+            <Ionicons name="rocket" size={28} color="#FFFFFF" />
+          </View>
+          <View style={commonStyles.flexOne}>
+            <Text style={styles.heroEyebrow}>Current Track</Text>
+            <Text style={styles.heroTitle} numberOfLines={2}>
+              {summary.career_title || "Select a goal in Profile"}
+            </Text>
+          </View>
+        </View>
+        
+        <View style={[styles.heroStats, width < 380 && styles.heroStatsCol]}>
+          <View style={styles.heroStat}>
+            <Text style={styles.heroStatValue}>{summary.completed_tasks ?? 0}</Text>
+            <Text style={styles.heroStatLabel}>Tasks Done</Text>
+          </View>
+          <View style={styles.heroDivider} />
+          <View style={styles.heroStat}>
+            <Text style={styles.heroStatValue}>{techAvg}%</Text>
+            <Text style={styles.heroStatLabel}>Tech Proficiency</Text>
+          </View>
+          <View style={styles.heroDivider} />
+          <View style={styles.heroStat}>
+            <Text style={styles.heroStatValue}>{softAvg}%</Text>
+            <Text style={styles.heroStatLabel}>Soft Skills</Text>
+          </View>
         </View>
       </AppCard>
 
-      <AppCard style={commonStyles.stackMd}>
-        <Text style={styles.sectionTitle}>Soft skills</Text>
-        <View style={commonStyles.stackMd}>
-          {softSkills.map((skill) => (
-            <View key={skill.name} style={commonStyles.stackXs}>
-              <View style={commonStyles.progressSummaryRow}>
-                <Text style={commonStyles.cardBodyStrong}>{skill.name}</Text>
-                <Text style={commonStyles.helperText}>{skill.level}%</Text>
-              </View>
-              <ProgressBar value={skill.level} color={palette.secondary} />
-            </View>
-          ))}
-        </View>
-      </AppCard>
+      <SkillSection title="Technical Skills" subtitle="Core competencies for your role" tone="tech" skills={technicalSkills} empty="No technical skills found for this goal." />
+
+      <SkillSection title="Soft Skills" subtitle="Essential interpersonal abilities" tone="soft" skills={softSkills} empty="No soft skills found for this goal." />
     </ScrollView>
   );
 }
 
+function avgPct(skills: { current_pct?: number }[]) {
+  if (!skills.length) return 0;
+  const sum = skills.reduce((a, s) => a + (typeof s.current_pct === "number" ? s.current_pct : 0), 0);
+  return Math.round(sum / skills.length);
+}
+
+function SkillSection({
+  title,
+  subtitle,
+  tone,
+  skills,
+  empty,
+}: {
+  title: string;
+  subtitle: string;
+  tone: "tech" | "soft";
+  skills: any[];
+  empty: string;
+}) {
+  const barColor = tone === "tech" ? palette.primary : palette.secondary;
+
+  return (
+    <View style={styles.sectionContainer}>
+      <View style={styles.sectionHeader}>
+        <View style={[styles.sectionIcon, { backgroundColor: tone === "tech" ? palette.chipBlue : palette.chipPurple }]}>
+          <Ionicons name={tone === "tech" ? "code-slash" : "chatbubbles"} size={18} color={barColor} />
+        </View>
+        <View>
+          <Text style={styles.sectionTitle}>{title}</Text>
+          <Text style={styles.sectionSub}>{subtitle}</Text>
+        </View>
+      </View>
+
+      {skills.length === 0 ? (
+        <AppCard style={styles.emptyCard}>
+          <Text style={styles.empty}>{empty}</Text>
+        </AppCard>
+      ) : (
+        <View style={commonStyles.stackMd}>
+          {skills.map((skill: any) => (
+            <AppCard key={String(skill.skill_id)} style={styles.skillBlock}>
+              <View style={commonStyles.progressSummaryRow}>
+                <Text style={styles.skillName} numberOfLines={2}>{skill.skill_name}</Text>
+                <View style={styles.pctBadge}>
+                  <Text style={[styles.skillPct, { color: barColor }]}>
+                    {skill.current_pct}%
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.levelRow}>
+                <Text style={styles.levelHint}>
+                  Level: <Text style={styles.levelValue}>{skill.current_level || "Beginner"}</Text>
+                </Text>
+                <Text style={styles.levelHint}>
+                  Target: <Text style={styles.levelValue}>{skill.required_level || "Intermediate"}</Text>
+                </Text>
+              </View>
+              <ProgressBar value={Math.min(skill.current_pct, 100)} color={barColor} />
+            </AppCard>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  screenContent: {
-    paddingHorizontal: 20,
-    paddingTop: 18,
-    paddingBottom: 24,
+  hero: {
+    backgroundColor: palette.primaryDark,
+    borderColor: "rgba(255,255,255,0.1)",
+    padding: 20,
+    gap: 20,
+  },
+  heroTop: {
+    flexDirection: "row",
+    alignItems: "center",
     gap: 16,
   },
-  statsRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12,
+  heroIconWrap: {
+    width: 60,
+    height: 60,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
   },
-  smallMetricCard: {
-    minWidth: 74,
+  heroEyebrow: {
+    color: "rgba(255,255,255,0.6)",
+    fontWeight: "800",
+    fontSize: 11,
+    letterSpacing: 1,
+    textTransform: "uppercase",
+    marginBottom: 4,
+  },
+  heroTitle: {
+    color: "#FFFFFF",
+    fontSize: 22,
+    fontWeight: "900",
+    letterSpacing: -0.5,
+  },
+  heroStats: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.15)",
+    paddingVertical: 16,
+    borderRadius: 16,
+  },
+  heroStatsCol: {
+    flexDirection: "column",
+  },
+  heroStat: {
     flex: 1,
     alignItems: "center",
-    gap: 4,
+    gap: 2,
   },
-  smallMetricValue: {
+  heroStatValue: {
     fontSize: 20,
-    fontWeight: "800",
-    color: palette.primary,
+    fontWeight: "900",
+    color: "#FFFFFF",
   },
-  smallMetricLabel: {
-    fontSize: 12,
-    color: palette.muted,
-    textAlign: "center",
+  heroStatLabel: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "rgba(255,255,255,0.5)",
+    textTransform: "uppercase",
+  },
+  heroDivider: {
+    width: 1,
+    height: 24,
+    backgroundColor: "rgba(255,255,255,0.1)",
+  },
+  sectionContainer: {
+    marginTop: 24,
+    gap: 16,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 4,
+  },
+  sectionIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: "800",
+    fontWeight: "900",
     color: palette.text,
+  },
+  sectionSub: {
+    fontSize: 13,
+    color: palette.muted,
+    fontWeight: "500",
+  },
+  emptyCard: {
+    padding: 20,
+    alignItems: "center",
+  },
+  empty: {
+    fontSize: 14,
+    color: palette.muted,
+    textAlign: "center",
+  },
+  skillBlock: {
+    padding: 16,
+    gap: 12,
+  },
+  skillName: {
+    flex: 1,
+    fontWeight: "800",
+    fontSize: 15,
+    color: palette.text,
+  },
+  pctBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    backgroundColor: palette.surfaceMuted,
+  },
+  skillPct: {
+    fontWeight: "900",
+    fontSize: 13,
+  },
+  levelRow: {
+    flexDirection: "row",
+    gap: 16,
+  },
+  levelHint: {
+    fontSize: 12,
+    color: palette.muted,
+    fontWeight: "600",
+  },
+  levelValue: {
+    color: palette.text,
+    fontWeight: "800",
   },
 });
